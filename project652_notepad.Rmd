@@ -1,0 +1,29 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r}
+hui <- read.csv("hui.csv")
+dim(hui)
+summary(hui)
+```
+
+DHHGAGE - This variable indicates the age of the selected respondent. (p29)
+DHH_SEX - sex of the patient
+HUIDCOG - Cognition (Function Code) This variable classifies respondents based on cognitive health status. (p53)
+HUIGDEX - This variable classifies the respondents based on their state of dexterity trouble. (p55)
+HUIDEMO - This variable classifies respondents based on emotional health status. (p55)
+HUIGHER - This variable classifies the respondents based on their hearing state. (p57)
+HUIGMOB - This variable classifies the respondents based on their state of mobility trouble. (p59)
+HUIGSPE - This variable classifies the respondents based on their state of speech trouble. (p60)
+Target HUIGVIS - This variable classifies the respondents based on their vision state. (p62)
+
+```{r}
+library(rpart)
+fit <- rpart(HUIGVIS ~ .,method="class", data=hui)
+
+```
+
