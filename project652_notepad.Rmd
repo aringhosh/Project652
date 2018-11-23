@@ -3,27 +3,107 @@ title: "R Notebook"
 output: html_notebook
 ---
 
-
-
 ```{r}
-hui <- read.csv("hui.csv")
-dim(hui)
-summary(hui)
+orig.hui <- read.csv("hui.csv")
 ```
 
-DHHGAGE - This variable indicates the age of the selected respondent. (p29)
-DHH_SEX - sex of the patient
-HUIDCOG - Cognition (Function Code) This variable classifies respondents based on cognitive health status. (p53)
-HUIGDEX - This variable classifies the respondents based on their state of dexterity trouble. (p55)
-HUIDEMO - This variable classifies respondents based on emotional health status. (p55)
-HUIGHER - This variable classifies the respondents based on their hearing state. (p57)
-HUIGMOB - This variable classifies the respondents based on their state of mobility trouble. (p59)
-HUIGSPE - This variable classifies the respondents based on their state of speech trouble. (p60)
-Target HUIGVIS - This variable classifies the respondents based on their vision state. (p62)
 
 ```{r}
-library(rpart)
-fit <- rpart(HUIGVIS ~ .,method="class", data=hui)
+hui <- orig.hui
+dim(hui)
+# hui[, lapply(.SD, function(x) gsub("\\s", "_", x))]
+# hui= as.data.frame(apply(hui,2,function(x)gsub('\\s+', '_',x)))
+summary(hui)
+# str(hui)
+```
+
+DHHGAGE - This variable indicates the age of the selected respondent. (p29)  
+DHH_SEX - sex of the patient  
+Target HUIDCOG - Cognition (Function Code) This variable classifies respondents based on cognitive health status. (p53)  
+HUIGDEX - This variable classifies the respondents based on their state of dexterity trouble. (p55)  
+HUIDEMO - This variable classifies respondents based on emotional health status. (p55)  
+HUIGHER - This variable classifies the respondents based on their hearing state. (p57)  
+HUIGMOB - This variable classifies the respondents based on their state of mobility trouble. (p59)  
+HUIGSPE - This variable classifies the respondents based on their state of speech trouble. (p60)  
+HUIGVIS - This variable classifies the respondents based on their vision state. (p62)  
+
+## Analysis
+
+Target variable - HUIDCOG 
+1. We should remove HUIDCOG == 'NOT STATED' since its incomplete record
+```{r}
+hui = hui[hui$HUIDCOG!= 'NOT STATED',]
+```
+
+##Target Based Encoding in R (For Ordinal Logistic we can skip it)
+```{r}
+# target.encode.prob <- function(column_name){
+#   var = hui[,column_name]
+#   target = hui$HUIDCOG
+#   t = table(var, target)
+#   encoded_values = t[,2]/ (t[,1] + t[,2])
+#   encoded_table <- as.data.frame(encoded_values)
+#   encoded_table[column_name] <- rownames(encoded_table)
+#   # print(encoded_table)
+#   encodes <- merge.data.frame(hui, encoded_table)$encoded_values
+#   
+#   return(encodes)
+# }
+# # lookup = target.encode.prob("HUIGDEX")
+# hui$DHHGAGE = target.encode.prob("DHHGAGE")
+# hui$DHH_SEX = target.encode.prob("DHH_SEX")
+# hui$HUIGHER = target.encode.prob("HUIGHER")
+# hui$HUIDEMO = target.encode.prob("HUIDEMO")
+# hui$HUIGMOB = target.encode.prob("HUIGMOB")
+# hui$HUIGSPE = target.encode.prob("HUIGSPE")
+# hui$HUIGVIS = target.encode.prob("HUIGVIS")
+# hui$HUIGDEX = target.encode.prob("HUIGDEX")
+# summary(hui)
+```
+
+## Train Test split
+```{r}
+## 75% of the sample size
+smp_size <- floor(0.70 * nrow(hui))
+
+## set the seed to make your partition reproducible
+set.seed(19)
+train_ind <- sample(seq_len(nrow(hui)), size = smp_size)
+
+hui.train <- hui[train_ind, ]
+hui.test <- hui[-train_ind, ]
+```
+
+## Ordinal Logistic Regression
+```{r}
+# Load the library
+library(MASS)
+model <- polr(HUIDCOG ~ ., data=hui.train)
+summary(model)
+```
+
+P values for ordinal logistics
+```{r}
+ctable <- coef(summary(model))
+## calculate and store p values
+p <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
+
+## combined table
+(ctable <- cbind(ctable, "p value" = p))
+# significant p-value for DHH_SEX & HUIGDEX
+```
+
+# Predictions
+```{r}
+library(caret)
+# head(predict(model, hui.test, type = 'prob'))
+pred <- predict(model, hui.test)
+confusionMatrix(hui.test$HUIDCOG, pred)
+
+```
+
+
+```{r}
 
 ```
 
