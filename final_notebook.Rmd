@@ -1,0 +1,136 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(dplyr, quietly = T)
+library(caret, quietly = T)
+library(MASS, quietly = T)
+```
+
+```{r}
+orig.hui <- read.csv("hui.csv")
+```
+
+
+```{r}
+hui <- orig.hui
+hui$HUIDCOG = ifelse(hui$HUIDCOG=='COG. ATT. LEVE 1', 1, 0)
+
+# remove NOT STATED
+hui <- hui[hui$HUIDCOG!= 'NOT STATED',]
+hui$HUIDCOG <- factor(hui$HUIDCOG)
+
+table(hui$HUIDCOG)
+
+```
+
+Explore: Data
+Age:
+```{r}
+# plot(hui$DHHGAGE, hui$HUIDCOG)
+lookup = data.frame(DHHGAGE=levels(hui$DHHGAGE), meanAges=c(47, 52, 57, 62, 67, 72, 77, 82, 87))
+hui = select(merge(hui, lookup, by="DHHGAGE"), -DHHGAGE)
+
+rm(lookup)
+```
+
+Emotional index, happy/not happy
+```{r}
+# plot(hui$HUIDEMO); 
+lookup = data.frame(HUIDEMO=levels(hui$HUIDEMO), isHappy=c('Happy', 'Happy', 'Unhappy','Unhappy','Unhappy','Unhappy'))
+hui = select(merge(hui, lookup, by="HUIDEMO"), -HUIDEMO)
+rm(lookup)
+
+# plot( hui$isHappy, hui$meanAges)
+```
+
+```{r}
+# plot(hui$HUIGHER, as.factor(hui$meanAges))
+
+lookup = data.frame(HUIGHER=levels(hui$HUIGHER), 
+                    hearingState=c('Good', 'Bad', 'Good','Bad'))
+hui = select(merge(hui, lookup, by="HUIGHER"), -HUIGHER)
+```
+
+```{r}
+lookup = data.frame(HUIGMOB=levels(hui$HUIGMOB), 
+                    mobilityHelp=c(T, F, F, F,T))
+hui = select(merge(hui, lookup, by="HUIGMOB"), -HUIGMOB)
+```
+
+```{r}
+lookup = data.frame(HUIGVIS=levels(hui$HUIGVIS), 
+                    visualProb=c(T, T, F, F))
+hui = select(merge(hui, lookup, by="HUIGVIS"), -HUIGVIS)
+```
+
+Remove unwanted columns with high bias:
+```{r}
+hui = select(hui, -c(HUIGDEX, HUIGSPE))
+```
+
+
+```{r}
+## 70% of the sample size
+smp_size <- floor(0.70 * nrow(hui))
+
+## set the seed to make your partition reproducible
+set.seed(19)
+train_ind <- sample(seq_len(nrow(hui)), size = smp_size)
+
+hui.train <- hui[train_ind, ]
+hui.test <- hui[-train_ind, ]
+```
+
+Models:
+```{r}
+reduced.model <- HUIDCOG ~ isHappy + mobilityHelp + hearingState + meanAges
+```
+
+GLM
+```{r}
+model <- glm(as.factor(HUIDCOG) ~ ., data=hui.train, family = binomial())
+model <- glm(HUIDCOG ~ isHappy + mobilityHelp + hearingState + meanAges,
+               data=hui.train, family = binomial())
+pred <- predict(model, hui.test)
+pred_class <- ifelse(pred > 0.5, 1, 0)
+confusionMatrix(hui.test$HUIDCOG, pred_class)
+```
+
+LDA:
+
+```{r}
+lda.model <- lda(reduced.model, data=hui.train)
+lda.pred <- predict(lda.model, hui.test)
+pred_class <- lda.pred$class
+confusionMatrix(hui.test$HUIDCOG, pred_class)
+```
+SImple Tree:
+```{r}
+library(randomForest)
+tr <- randomForest(HUIDCOG ~ ., data=hui.test, 
+                   ntree = 500, mtry=2,importance=TRUE)
+pred <- predict(tr, hui.test)
+confusionMatrix(hui.test$HUIDCOG, pred_class)
+varImpPlot(tr)
+```
+
+XGBOOST:
+```{r}
+require(xgboost)
+require(Matrix)
+require(data.table)
+
+
+# sparse_matrix <- sparse.model.matrix(HUIDCOG ~ ., data = hui.train)[,-1]
+sparse_matrix <- sparse.model.matrix(reduced.model, data = hui.train)[,-1]
+output_vector = hui.train$HUIDCOG == 1 #== "Healthy" # binary
+bst <- xgboost(data = sparse_matrix, label = output_vector, max_depth = 30,
+               print_every_n = 100,
+               eta = 0.2, nthread = 4, nrounds = 500, objective = "binary:logistic")
+plot(bst$evaluation_log, type ='l')
+
+```
+

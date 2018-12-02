@@ -1,6 +1,8 @@
 ---
 title: "R Notebook"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r}
@@ -13,18 +15,18 @@ hui <- orig.hui
 dim(hui)
 # hui[, lapply(.SD, function(x) gsub("\\s", "_", x))]
 # hui= as.data.frame(apply(hui,2,function(x)gsub('\\s+', '_',x)))
-summary(hui)
+# summary(hui)
 # str(hui)
 ```
 
 DHHGAGE - This variable indicates the age of the selected respondent. (p29)  
 DHH_SEX - sex of the patient  
 Target HUIDCOG - Cognition (Function Code) This variable classifies respondents based on cognitive health status. (p53)  
-HUIGDEX - This variable classifies the respondents based on their state of dexterity trouble. (p55)  
+x HUIGDEX - This variable classifies the respondents based on their state of dexterity trouble. (p55)  
 HUIDEMO - This variable classifies respondents based on emotional health status. (p55)  
 HUIGHER - This variable classifies the respondents based on their hearing state. (p57)  
 HUIGMOB - This variable classifies the respondents based on their state of mobility trouble. (p59)  
-HUIGSPE - This variable classifies the respondents based on their state of speech trouble. (p60)  
+x HUIGSPE - This variable classifies the respondents based on their state of speech trouble. (p60)  
 HUIGVIS - This variable classifies the respondents based on their vision state. (p62)  
 
 ## Analysis
@@ -32,7 +34,8 @@ HUIGVIS - This variable classifies the respondents based on their vision state. 
 Target variable - HUIDCOG 
 1. We should remove HUIDCOG == 'NOT STATED' since its incomplete record
 ```{r}
-hui = hui[hui$HUIDCOG!= 'NOT STATED',]
+hui <- hui[hui$HUIDCOG!= 'NOT STATED',]
+hui$HUIDCOG <- factor(hui$HUIDCOG)
 ```
 
 ##Target Based Encoding in R (For Ordinal Logistic we can skip it)
@@ -46,7 +49,7 @@ hui = hui[hui$HUIDCOG!= 'NOT STATED',]
 #   encoded_table[column_name] <- rownames(encoded_table)
 #   # print(encoded_table)
 #   encodes <- merge.data.frame(hui, encoded_table)$encoded_values
-#   
+# 
 #   return(encodes)
 # }
 # # lookup = target.encode.prob("HUIGDEX")
@@ -74,16 +77,59 @@ hui.train <- hui[train_ind, ]
 hui.test <- hui[-train_ind, ]
 ```
 
-## Ordinal Logistic Regression
+Single Model - polr
 ```{r}
 # Load the library
-library(MASS)
+library(MASS, quietly = T)
 model <- polr(HUIDCOG ~ ., data=hui.train)
-summary(model)
+# summary(model)
+
+library(caret)
+# head(predict(model, hui.test, type = 'prob'))
+pred <- predict(model, hui.test)
+confusionMatrix(hui.test$HUIDCOG, pred)
+
+```
+
+Another method:
+K(10)-fold CV
+```{r}
+library(MASS, quietly = T)
+library(caret, quietly = T)
+set.seed(19)
+
+k_fold <- 10
+cv.err <- rep(NA,k_fold)
+# cv.sensitivity <- matrix(data = NA, nrow = 6, ncol = k_fold, byrow = FALSE, dimnames = NULL) 
+# cv.specificity <- matrix(data = NA, nrow = 6, ncol = k_fold, byrow = FALSE, dimnames = NULL)
+
+#Randomly shuffle the data
+hui<-hui[sample(nrow(hui)),]
+#Create 10 equally size folds
+folds <- cut(seq(1,nrow(hui)),breaks=10, labels=FALSE)
+#Perform 10 fold cross validation
+for(i in 1:k_fold){
+  #Segement your data by fold using the which() function 
+  testIndexes <- which(folds==i, arr.ind=TRUE)
+  testData <- hui[testIndexes, ]
+  trainData <- hui[-testIndexes, ]
+  #Use the test and train data partitions however you desire...
+  model <- polr(HUIDCOG ~ ., data=trainData)
+  # print(model)
+  pred <- predict(model, testData)
+  confusion.matrix <- confusionMatrix(testData$HUIDCOG, pred)
+  # print(confusionMatrix(testData$HUIDCOG, pred))
+  cv.err[i] <- confusion.matrix$overall[[1]]
+  # cv.sensitivity[,i] <- confusion.matrix$byClass[,1]
+  # cv.specificity[,i] <- confusion.matrix$byClass[,2]
+}
+
+print(mean(cv.err))
+
 ```
 
 P values for ordinal logistics
-```{r}
+```{r eval=FALSE}
 ctable <- coef(summary(model))
 ## calculate and store p values
 p <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
@@ -93,17 +139,67 @@ p <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
 # significant p-value for DHH_SEX & HUIGDEX
 ```
 
-# Predictions
+## LDA
 ```{r}
-library(caret)
-# head(predict(model, hui.test, type = 'prob'))
-pred <- predict(model, hui.test)
-confusionMatrix(hui.test$HUIDCOG, pred)
+library(MASS)
+lda.model <- lda(HUIDCOG ~ ., data=hui.train)
+lda.pred <- predict(lda.model, hui.test)
+pred_class <- lda.pred$class
+mean(pred_class == hui.test$HUIDCOG)
+confusionMatrix(hui.test$HUIDCOG, pred_class)
+```
 
+##Idea 3:What if we treat anything other than COG.ATT.LEVE=1 as a group
+```{r}
+hui <- orig.hui
+hui$HUIDCOG = ifelse(hui$HUIDCOG=='COG. ATT. LEVE 1', 1, 0)
+table(hui$HUIDCOG)
+
+## 75% of the sample size
+smp_size <- floor(0.70 * nrow(hui))
+
+## set the seed to make your partition reproducible
+set.seed(19)
+train_ind <- sample(seq_len(nrow(hui)), size = smp_size)
+
+hui.train <- hui[train_ind, ]
+hui.test <- hui[-train_ind, ]
+```
+
+```{r}
+library(MASS)
+#LDA
+lda.model <- lda(HUIDCOG ~ ., data=hui.train)
+lda.pred <- predict(lda.model, hui.test)
+pred_class <- lda.pred$class
+mean(pred_class == hui.test$HUIDCOG)
+```
+```{r}
+model <- glm(HUIDCOG ~ ., data=hui.train)
+pred <- predict(model, hui.test)
+library(pROC)
+plot(roc(hui.test$HUIDCOG, pred, direction="<"),col="yellow", lwd=3)
 ```
 
 
 ```{r}
+require(xgboost)
+require(Matrix)
+require(data.table)
 
+
+sparse_matrix <- sparse.model.matrix(HUIDCOG ~ ., data = hui.train)[,-1]
+output_vector = hui.train$HUIDCOG == "COG. ATT. LEVE 1" # binary
+bst <- xgboost(data = sparse_matrix, label = output_vector, max_depth = 8,
+               print_every_n = 100,
+               eta = 0.2, nthread = 4, nrounds = 150,objective = "binary:logistic")
+plot(bst$evaluation_log, type ='l')
+# test <- ifelse(hui.test$HUIDCOG== "COG. ATT. LEVE 1", 1,0)
+# pred<- predict(bst, as.matrix(test))
+```
+
+```{r}
+importance <- xgb.importance(feature_names = colnames(sparse_matrix), model = bst)
+head(importance)
 ```
 

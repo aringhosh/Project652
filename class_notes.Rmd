@@ -1,0 +1,41 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+library(data.table)
+hs <- data.table::fread('HStrain.csv', header = T, sep = ',')
+```
+
+```{r}
+dim(hs)
+```
+
+Not available = missing data
+character string in responses
+ADM = administrative index (probably we don't need to use it)
+
+```{r}
+cn <- colnames(hs)
+print(length(unique(substr(cn,start=1,stop=3))))
+table(substr(cn,start=1,stop=3))
+```
+There are some summary variables that you can use instead. Need to go through the data table
+MCA ch 10 
+
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+

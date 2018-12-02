@@ -1,0 +1,183 @@
+---
+title: "STAT 652 Final Project"
+author: "Arin Ghosh"
+date: "12/1/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Introduction
+
+This is an analysis report of the data provided by the Canadian Community Health Survey (CCHS) – Healthy Aging module. The project is divided into 2 parts corresponding to two separate datasets provided to us. The first dataset has 20000 rows and 9 columns. In this dataset problem our task is to predict cognitive health index called HUIDCOG using 8 other health-utility-index (HUI) variables. In the second part of the project, we are tasked with building a regression model that predicts a real number called HUIDHSI, which is another measure of the HUI that provides a description of an individual’s overall functional health. The second dataset is much bigger in size compared to the first dataset, having 590 variables with 10000 rows. A part of the dataset is held out for validation purpose which was released to the students at a later date.
+
+## Part 1: Predicting HUIDCOG (Classification Analysis)
+
+## 1 Data
+
+### 1.1 Data Loading
+First step is to load the appropriate dataset into the R Studio environment. The dataset can be found on the project github repository. Once downloaded in to the working directory of the R Studio, we can load the data using read.csv() command.
+```{r}
+hui <- read.csv("hui.csv")
+summary(hui)
+```
+
+From the summary of the hui dataset, we can see that there are a total of 9 columns that exists. Further, we see from the summary that there are no NA or missing values, although there are several entries with value 'NOT STATED'. Also it is noteworthy to mention that none of the variables are continuous variables and the value which we are suppose to predict is a multivariate i.e. HUIDCOG can take one of the possible 7 values for each set of dependent variables. Although the dataset appear to be clean and variables are grouped, we will still need to do some analysis and take a look if we can reduce possible number of outcomes for each column without loosing a lot of quality in the dataset where it makes sense.
+
+### 1.2 Exploratory Data Analysis & Data Grouping
+
+#### Missing Data:
+To start with our data analysis, we can notice that for some of the responses, we have an inconclusive response i.e. ```hui$HUIDCOG== 'NOT STATED'```. We should first remove these records, since this leads to an observation where we don't know what is the outcome. 
+```{r}
+# remove NOT STATED from HUIDCOG
+hui <- hui[hui$HUIDCOG!= 'NOT STATED',]
+hui$HUIDCOG <- factor(hui$HUIDCOG)
+```
+
+#### Target Variabe:
+The given dataset is a fully categorical mulltivariate dataset meaning there are no columns with real numbers. This is something that is not extinsively discussed in our class, although we've been tought how to deal with categorical data in general. Since multivariate analysis is not extensively covered in the coursework, I am going to reduce the possible outcome of our dependent variable HUIDCOG from 6 to 2. To come up with a meaningful division, we must refer to the original documentation provided by the instructor. If we take a look into page 53 of CCHS_HA_Derived_variables.pdf then we can find out how these 6 different classes of HUIDCOG came into existence. For our analysis purpose I have divided our target variable HUIDCOG into a binary response where 1 refers to the patient is healthy in terms of cognitive abilities and 0 is unhealthy. We assign 1 if the patient is able to think clearly and solve day to day problems (COG. ATT. LEVE 1) and assign a 0 otherwise since in any other case it indicates some kind of issues with the patient's cognitive health abilities.
+```{r}
+hui$HUIDCOG = ifelse(hui$HUIDCOG=='COG. ATT. LEVE 1', 1, 0)
+```
+
+#### Dependent Variable Removal:
+
+Next we are interested in seeing the different class distribution of the 8 dependent variables. Particularly the variables HUIGDEX and HUIGSPE.
+
+```{r, echo=FALSE, fig.width=4, fig.height=3, message=FALSE}
+library(dplyr)
+dep <- select(hui, -c(HUIDCOG))
+lapply(select(dep, c(HUIGDEX, HUIGSPE)),function(freq_dist) {prop.table(table(freq_dist))})
+```
+Both of these variables, in my opinion, lacks diversity and is biased heavily towards one class than the others, therefore I have decided not to include these 2 variables in my analysis.
+```{r}
+hui = select(hui, -c(HUIGDEX, HUIGSPE))
+```
+
+
+#### Dependent Variable Group Collapsing:
+
+Furthermore, I have tried to reduce the number of groups for each of the remaining 6 variables to some degree where it makes sense. For example, instead of using 4 possible classes of HUIGHER, which classifies the respondents based on their hearing state, I have collapsed it into 2, marking HUIGHER as Good if there was a history of hearing problem (whether or not its corrected currently) or otherwise Bad there was no hearing complains ever for that particular patient. Below is a summary of the collapsing decisions that has been made in this analysis.
+
+##### HUIDEMO : Emotional index
+This variable classifies respondents based on emotional health status. The original record has 6 different levels based on different levels of emotional response. But we can reduce it to Happy or Unhappy based on broader definition. I have converted all of NOT STATED as Unhappy.
+```{r, echo=F}
+lookup = data.frame(HUIDEMO=levels(hui$HUIDEMO), isHappy=c('Happy', 'Happy', 'Unhappy','Unhappy','Unhappy','Unhappy'))
+hui = select(merge(hui, lookup, by="HUIDEMO"), -HUIDEMO)
+
+library(knitr)
+knitr::kable(
+  lookup,
+  caption = 'Mapping Table of HUIDEMO'
+)  
+```
+
+##### HUIGHER : Hearing State
+This variable classifies respondents based on hearing state of the patient. As explained earlier, the original 4 possible classes are reduced to a broader 2 general classes of Good or Bad indicating if the patient has a history of hearing issues.
+```{r, echo=F}
+lookup = data.frame(HUIGHER=levels(hui$HUIGHER), 
+                    hearingState=c('Good', 'Bad', 'Good','Bad'))
+hui = select(merge(hui, lookup, by="HUIGHER"), -HUIGHER)
+
+knitr::kable(
+  lookup,
+  caption = 'Mapping Table of HUIGHER'
+)
+```
+
+
+##### HUIGMOB : Mobility Trouble
+This variable classifies the respondents based on their state of mobility trouble. We classify this as TRUE or FALSE indicating if the respondent indicated that (s)he cannot move freely without external help.  
+```{r, echo=F}
+lookup = data.frame(HUIGMOB=levels(hui$HUIGMOB), 
+                    mobilityHelp=c(T, F, F, F,T))
+hui = select(merge(hui, lookup, by="HUIGMOB"), -HUIGMOB)
+
+knitr::kable(
+  lookup,
+  caption = 'Mapping Table of HUIGMOB'
+)
+```
+
+##### HUIGVIS : Vision State
+This variable classifies the respondents based on their vision state. Like HUIGMOB, I have mapped this to TRUE if the respondent has a history of vision problem and False otherwise.
+```{r, echo=F}
+lookup = data.frame(HUIGVIS=levels(hui$HUIGVIS), 
+                    visualProb=c(T, T, F, F))
+hui = select(merge(hui, lookup, by="HUIGVIS"), -HUIGVIS)
+
+knitr::kable(
+  lookup,
+  caption = 'Mapping Table of HUIGVIS'
+)
+```
+
+
+##### DHHGAGE : Age
+Instead of age groups, I have take the mean age of the group, although since I am not reducing the number of classes here, it is probably not going to add a lot of value in the complexity reduction of our final model, unless we decide not to use this variable. 
+```{r, echo=F}
+lookup = data.frame(DHHGAGE=levels(hui$DHHGAGE), meanAges=c(47, 52, 57, 62, 67, 72, 77, 82, 87))
+hui = select(merge(hui, lookup, by="DHHGAGE"), -DHHGAGE)
+
+knitr::kable(
+  lookup,
+  caption = 'Mapping Table of DHHGAGE'
+)
+```
+
+Here is the glance of the final dataset after data cleaning that we will be using in our model building.
+```{r, echo=F}
+knitr::kable(
+  head(hui),
+  caption = 'Final Dataset To Be Used For Model Building'
+)
+
+summary(hui)
+```
+
+
+## 2 Methods
+
+In this part of the project, I have used some of the classification techniques that were taught over the course from Logistic Regression to Support Vector Machines. However for focussing on one technique, **Logistic Regression** is preferred which is interpretable and gives a low missclassification error rate as well as decent Specificity and Sensitivity score. I have used the variable importance table from random forest models to select a subgroup of variables to further tune my models. I have attached the details into the **Appendix** section.
+
+### 2.1 Logistic Regression
+
+Logistic Regression uses the logistic function fitted by **maximum likelihood**. It performs well even if the predictors do not follow Gaussian distribution. The model is a linear model in the log-odds of success
+$$ \log \left( \frac{p(X)}{1-p(X)} \right) = 
+X \beta = \beta_0 + X_1 \beta_1 + \ldots + 
+X_p \beta_p. $$
+
+Since our dependent variable takes a 0/1 binary response, we can use this model. Unlike linear regression where one unit change in the predictor variable (X) results in one unit change in Y, here one unit increase in $X_j$ , while holding all others fixed is associated with a $\beta_j$ change in the log-odds.
+
+Let’s start with baseline model in logistic regression. Before fitting the model, dataset is split into training and testing set in random sampled fashion of ratio 70:30. The model is fitted to train data and then predict the test data to validate based on its accuracy, sensitivity, specificity, etc.
+
+The coefficients must be estimated based on the available training data. For logistic regression, the more
+general method of maximum likelihood is preferred for its robust statistical properties. Basically, the algorithm tries to find coefficients that maximize the likelihood that the probabilities are closest to 1 for people who don't have any problem in terms of patient's cognitive abilities (i.e. the respondent is able to think clearly and can solve day to day problems), and close to zero for people who has some type of cognitive disability and cannot carry out their day-to-day activity without some degree of help. 
+During my experiment I have found that isHappy, mobilityHelp, hearingState, and meanAges are the most important variables so I have included only these 4 variables in my final model. Below table shows summary of estimates, Std.Error and p-value in the order of significance after performing logistic regression to the training data.
+
+
+```{r, echo=F}
+glm.model <- glm(HUIDCOG ~ isHappy + mobilityHelp + hearingState + meanAges,
+               data=hui, family = binomial())
+coef_table <- summary(glm.model)$coefficients
+coef_table[,"Pr(>|z|)"] = format(coef_table[,"Pr(>|z|)"], digits = 3)
+
+knitr::kable(
+  coef_table,
+  caption = 'Summary of Final Logistic Regression and its odd-ratios'
+)
+```
+
+And here is the confusion matrix for the model indicating various measurements including accuracy, its 95% confidence interval, sensitivity, specificity and balanced accuracy as well.
+
+```{r, echo=F, message=FALSE, warning=FALSE}
+library(caret)
+pred <- predict(glm.model, hui)
+pred_class <- ifelse(pred > 0.5, 1, 0)
+confusionMatrix(hui$HUIDCOG, pred_class)
+```
+
+
+
