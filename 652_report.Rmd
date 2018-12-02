@@ -9,6 +9,7 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+
 ## 1. Introduction
 
 This is an analysis report of the data provided by the Canadian Community Health Survey (CCHS) – Healthy Aging module. The project is divided into 2 parts corresponding to two separate datasets provided to us. The first dataset has 20000 rows and 9 columns. In this dataset problem our task is to predict cognitive health index called HUIDCOG using 8 other health-utility-index (HUI) variables. In the second part of the project, we are tasked with building a regression model that predicts a real number called HUIDHSI, which is another measure of the HUI that provides a description of an individual’s overall functional health. The second dataset is much bigger in size compared to the first dataset, having 590 variables with 10000 rows. A part of the dataset is held out for validation purpose which was released to the students at a later date.
@@ -179,5 +180,36 @@ pred_class <- ifelse(pred > 0.5, 1, 0)
 confusionMatrix(hui$HUIDCOG, pred_class)
 ```
 
+## 3. Results
 
+### 3.1 Model Interpretation
 
+On examining the fitted logistic regression model summary above, we can see that all the predictors are **statistically significant** with p-values far less than required 5%. These results also concur with the findings that predictors such as HUIGDEX, HUIGSPE, and DHH_SEX are not very significant predictors in determining a respondents cognitive health state. When we compare the full model of all available variables *(DHH_SEX + meanAges + isHappy + hearingState + mobilityHelp + visualProb)* with that of a model build on the subset of 4 predictors $(isHappy + mobilityHelp + hearingState + meanAges)$  using Anova chisq test, a small p-value $(7.693e-08) < 0.05$ indicated that both models are similar - thus parsimoniously we chose the smaller model. Also, we have checked with various available logistic  regression model selection techniques such as best subset, forward, backward and step-wise selection, all of them pointed to the four predictors that was used in the final model build. Therefore the final model that we've selected for predicting **HUIDCOG** is: $$ y_i = \beta_0 + isHappy * \beta_1 + mobilityHelp * \beta_2 + hearingState * \beta_3 + meanAges * \beta_4 $$
+We can interprete the model in this way: If a respondent reported that (s)he requires mobility help == 1, keeping other predictor unchanged, that can be associated with an estimated increase of (-0.53) units in the log-odds of the respondent being cognitively healthy. We can see from the Table 7 that it is estimated that if the respondent is classified as happy or need no mobility help or has a good hearing state or is younger (selecting any one of these predictor while not changing the others) it generally is an indication of the respondent is cognitively healthy, which makes sense. Now we can not only point out which predictor is associated with diminishing cognitive ability but we can also indicate more relevant statistics which is by how much units they affect the mental state of the patients.
+
+#### 3.2 Model Evaluation
+
+Logistic regression model is used to predict the test data as well as the validation dataset that was released later to the students. We have used various statistical measures to measure the effectiveness of this model such as missclassification rate, sensitivity, specificity and Area under the ROC curve. We have also tried k fold cross validation on the training data set. Below is a graph that shows the ROC curve plot that is derived on the test dataset. The value of Area under the ROC curve we got is ~0.61. Based on various cut-off values, we found a cut-off of 0.5 leads to the best balance of accuracy, sensitivity and specificity. Please refer to the Appendix for further details on this section's derivations. 
+
+#### 3.3 Comparisons of Classification Models
+
+This sections shows the various models that we tried along with Logistic Regression model that was ultimately selected. The classification was model was build on 70% of the available data and 30% of the data was used for testing. Different metric that are used to compare the models are discussed in the following:
+
+**Mis-classification Error:** The number of observations that were predicted wrongly by the model. It is the
+proportion of misclassified observations.
+
+**Sensitivity:** It is the ability of a model to correctly identify those with diabetic disease. It is observed True positive rate. TP/(TP+FN) where TP is True Positive and FN is False Negative.
+
+**Specificity:** It is the ability of a model to correctly identify those without diabetic disease. It is observed True negative rate. TN/(TN+FP) where TP is True Negative and FP is False Positive.
+
+**Area Under Curve ( AUC):** It is a measure of the overall performance of the classifier. If it is close to
+one, then model is performing as good as the real truth. On the other hand, if AUC is 0.5, then model would
+perform no better than null classifier.
+
+```{r}
+# ToDO different models
+```
+
+## Conclusion and Discussion
+
+After going through all the models, we have picked the logistic regression model with four predictors as our final selected model. However we have only considered linear terms in this model, which can be a drawback in this model. Therefore in the future it will be noteworthy to check how adding interaction and non-linear terms changes the predictive ability of the logistic regression model, or if there are any other family of classification techniques stands out when these new terms are introduced. We can try for even more powerful models such as deep neural networks to see if that helps us to give a better result. Finally all these discussions are based on the dataset that was provided to us. The correctness of this model will change as new data are available to us in the future, so that we might have to tune it later.

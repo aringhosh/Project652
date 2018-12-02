@@ -31,7 +31,7 @@ Age:
 ```{r}
 # plot(hui$DHHGAGE, hui$HUIDCOG)
 lookup = data.frame(DHHGAGE=levels(hui$DHHGAGE), meanAges=c(47, 52, 57, 62, 67, 72, 77, 82, 87))
-hui = select(merge(hui, lookup, by="DHHGAGE"), -DHHGAGE)
+hui = dplyr::select(merge(hui, lookup, by="DHHGAGE"), -DHHGAGE)
 
 rm(lookup)
 ```
@@ -40,7 +40,7 @@ Emotional index, happy/not happy
 ```{r}
 # plot(hui$HUIDEMO); 
 lookup = data.frame(HUIDEMO=levels(hui$HUIDEMO), isHappy=c('Happy', 'Happy', 'Unhappy','Unhappy','Unhappy','Unhappy'))
-hui = select(merge(hui, lookup, by="HUIDEMO"), -HUIDEMO)
+hui = dplyr::select(merge(hui, lookup, by="HUIDEMO"), -HUIDEMO)
 rm(lookup)
 
 # plot( hui$isHappy, hui$meanAges)
@@ -51,24 +51,24 @@ rm(lookup)
 
 lookup = data.frame(HUIGHER=levels(hui$HUIGHER), 
                     hearingState=c('Good', 'Bad', 'Good','Bad'))
-hui = select(merge(hui, lookup, by="HUIGHER"), -HUIGHER)
+hui = dplyr::select(merge(hui, lookup, by="HUIGHER"), -HUIGHER)
 ```
 
 ```{r}
 lookup = data.frame(HUIGMOB=levels(hui$HUIGMOB), 
                     mobilityHelp=c(T, F, F, F,T))
-hui = select(merge(hui, lookup, by="HUIGMOB"), -HUIGMOB)
+hui = dplyr::select(merge(hui, lookup, by="HUIGMOB"), -HUIGMOB)
 ```
 
 ```{r}
 lookup = data.frame(HUIGVIS=levels(hui$HUIGVIS), 
                     visualProb=c(T, T, F, F))
-hui = select(merge(hui, lookup, by="HUIGVIS"), -HUIGVIS)
+hui = dplyr::select(merge(hui, lookup, by="HUIGVIS"), -HUIGVIS)
 ```
 
 Remove unwanted columns with high bias:
 ```{r}
-hui = select(hui, -c(HUIGDEX, HUIGSPE))
+hui = dplyr::select(hui, -c(HUIGDEX, HUIGSPE))
 ```
 
 
@@ -91,13 +91,36 @@ reduced.model <- HUIDCOG ~ isHappy + mobilityHelp + hearingState + meanAges
 
 GLM
 ```{r}
-model <- glm(as.factor(HUIDCOG) ~ ., data=hui.train, family = binomial())
-model <- glm(HUIDCOG ~ isHappy + mobilityHelp + hearingState + meanAges,
+full.model <- glm(as.factor(HUIDCOG) ~ ., data=hui.train, family = binomial())
+small.model <- glm(as.factor(HUIDCOG) ~ isHappy + mobilityHelp + hearingState + meanAges,
                data=hui.train, family = binomial())
-pred <- predict(model, hui.test)
+pred <- predict(small.model, hui.test)
 pred_class <- ifelse(pred > 0.5, 1, 0)
 confusionMatrix(hui.test$HUIDCOG, pred_class)
 ```
+
+Model Selection:
+```{r}
+require(leaps)
+cfits.fwd <- regsubsets(HUIDCOG ~ .,data=hui.train, method="forward")
+cfitsfwsd.sum <- summary(cfits.fwd)
+plot(cfits.fwd,scale="Cp")
+```
+
+GLM Anova analysis:
+```{r}
+anova(full.model,small.model,test ="Chisq")
+```
+
+GLM ROC Curve
+```{r}
+library(pROC)
+pred <- predict(small.model, hui.test)
+roc(hui.test$HUIDCOG, pred, direction="<")
+plot(roc(hui.test$HUIDCOG, pred, direction="<"),col="yellow", lwd=3)
+```
+
+
 
 LDA:
 
@@ -107,7 +130,7 @@ lda.pred <- predict(lda.model, hui.test)
 pred_class <- lda.pred$class
 confusionMatrix(hui.test$HUIDCOG, pred_class)
 ```
-SImple Tree:
+RF Tree:
 ```{r}
 library(randomForest)
 tr <- randomForest(HUIDCOG ~ ., data=hui.test, 
