@@ -7,6 +7,7 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
 ```
 
 
@@ -49,12 +50,12 @@ Next we are interested in seeing the different class distribution of the 8 depen
 
 ```{r, echo=FALSE, fig.width=4, fig.height=3, message=FALSE}
 library(dplyr)
-dep <- select(hui, -c(HUIDCOG))
-lapply(select(dep, c(HUIGDEX, HUIGSPE)),function(freq_dist) {prop.table(table(freq_dist))})
+dep <- dplyr::select(hui, -c(HUIDCOG))
+lapply(dplyr::select(dep, c(HUIGDEX, HUIGSPE)),function(freq_dist) {prop.table(table(freq_dist))})
 ```
 Both of these variables, in my opinion, lacks diversity and is biased heavily towards one class than the others, therefore I have decided not to include these 2 variables in my analysis.
 ```{r}
-hui = select(hui, -c(HUIGDEX, HUIGSPE))
+hui = dplyr::select(hui, -c(HUIGDEX, HUIGSPE))
 ```
 
 
@@ -66,9 +67,9 @@ Furthermore, I have tried to reduce the number of groups for each of the remaini
 This variable classifies respondents based on emotional health status. The original record has 6 different levels based on different levels of emotional response. But we can reduce it to Happy or Unhappy based on broader definition. I have converted all of NOT STATED as Unhappy.
 ```{r, echo=F}
 lookup = data.frame(HUIDEMO=levels(hui$HUIDEMO), isHappy=c('Happy', 'Happy', 'Unhappy','Unhappy','Unhappy','Unhappy'))
-hui = select(merge(hui, lookup, by="HUIDEMO"), -HUIDEMO)
+hui = dplyr::select(merge(hui, lookup, by="HUIDEMO"), -HUIDEMO)
 
-library(knitr)
+
 knitr::kable(
   lookup,
   caption = 'Mapping Table of HUIDEMO'
@@ -80,7 +81,7 @@ This variable classifies respondents based on hearing state of the patient. As e
 ```{r, echo=F}
 lookup = data.frame(HUIGHER=levels(hui$HUIGHER), 
                     hearingState=c('Good', 'Bad', 'Good','Bad'))
-hui = select(merge(hui, lookup, by="HUIGHER"), -HUIGHER)
+hui = dplyr::select(merge(hui, lookup, by="HUIGHER"), -HUIGHER)
 
 knitr::kable(
   lookup,
@@ -94,7 +95,7 @@ This variable classifies the respondents based on their state of mobility troubl
 ```{r, echo=F}
 lookup = data.frame(HUIGMOB=levels(hui$HUIGMOB), 
                     mobilityHelp=c(T, F, F, F,T))
-hui = select(merge(hui, lookup, by="HUIGMOB"), -HUIGMOB)
+hui = dplyr::select(merge(hui, lookup, by="HUIGMOB"), -HUIGMOB)
 
 knitr::kable(
   lookup,
@@ -107,7 +108,7 @@ This variable classifies the respondents based on their vision state. Like HUIGM
 ```{r, echo=F}
 lookup = data.frame(HUIGVIS=levels(hui$HUIGVIS), 
                     visualProb=c(T, T, F, F))
-hui = select(merge(hui, lookup, by="HUIGVIS"), -HUIGVIS)
+hui = dplyr::select(merge(hui, lookup, by="HUIGVIS"), -HUIGVIS)
 
 knitr::kable(
   lookup,
@@ -120,7 +121,7 @@ knitr::kable(
 Instead of age groups, I have take the mean age of the group, although since I am not reducing the number of classes here, it is probably not going to add a lot of value in the complexity reduction of our final model, unless we decide not to use this variable. 
 ```{r, echo=F}
 lookup = data.frame(DHHGAGE=levels(hui$DHHGAGE), meanAges=c(47, 52, 57, 62, 67, 72, 77, 82, 87))
-hui = select(merge(hui, lookup, by="DHHGAGE"), -DHHGAGE)
+hui = dplyr::select(merge(hui, lookup, by="DHHGAGE"), -DHHGAGE)
 
 knitr::kable(
   lookup,
@@ -213,3 +214,308 @@ perform no better than null classifier.
 ## Conclusion and Discussion
 
 After going through all the models, we have picked the logistic regression model with four predictors as our final selected model. However we have only considered linear terms in this model, which can be a drawback in this model. Therefore in the future it will be noteworthy to check how adding interaction and non-linear terms changes the predictive ability of the logistic regression model, or if there are any other family of classification techniques stands out when these new terms are introduced. We can try for even more powerful models such as deep neural networks to see if that helps us to give a better result. Finally all these discussions are based on the dataset that was provided to us. The correctness of this model will change as new data are available to us in the future, so that we might have to tune it later.
+
+\newpage
+
+## Appendix 1 (For Part 1)
+
+This section mainly deals with the code base that was used for the analysis part written for part 1.
+
+### Software Version:
+
+  * All analysis on this project was done using R Studio - version 1.1.456 – © 2009-2018 RStudio, Inc.
+  * OS - Mac OS v 10.14.1 (18B75)
+
+### Data Loading:
+Load all the required packages and some helper functions
+```{r library_chunk}
+library(dplyr, quietly = T)
+library(caret, quietly = T)
+library(MASS, quietly = T)
+library(pROC, quietly = T)
+library(randomForest, quietly = T)
+library(leaps, quietly = T)
+library(caret, quietly = T)
+library(gam, quietly = T)
+
+getCMMeasurements <- function(cm){
+  accuracy = cm$overall[[1]]
+  sensitivity = cm$byClass[[1]]
+  specificity = cm$byClass[[2]]
+  result <- t(as.data.frame(c(accuracy, sensitivity, specificity)))
+  colnames(result) <- c('accuracy', 'sensitivity', 'specificity')
+  rownames(result) <- NULL
+  return(result)
+}
+```
+
+Read the csv file and get a summary of the data
+```{r}
+hui <- read.csv("hui.csv")
+summary(hui)
+```
+
+We are going to filter our target classes into 2 classes, based on the COG. ATT. LEVE value for HUIDCOG column. We say 1 if the respondent is doing alright, and 0 if there's some risk of imperfect cognitive attention level.
+```{r , fig.height = 3, fig.width = 3, fig.align = "center", fig.cap="\\label{fig:figs}distribution of target variable"}
+hui$HUIDCOG = as.factor(ifelse(hui$HUIDCOG=='COG. ATT. LEVE 1', 1, 0))
+plot(hui$HUIDCOG)
+```
+
+### Data Cleaning
+
+We first need to remove all the incomplete responses.
+```{r}
+# remove NOT STATED
+hui <- hui[hui$HUIDCOG!= 'NOT STATED',]
+hui$HUIDCOG <- factor(hui$HUIDCOG)
+dim(hui)
+```
+
+Next we are going to go through each of the available independent variable columns to see if we can further group them down.
+The details of every variable:
+
++ DHHGAGE - This variable indicates the age of the selected respondent. (p29)  
++ DHH_SEX - sex of the patient  
++ <Target> HUIDCOG - Cognition (Function Code) This variable classifies respondents based on cognitive health status. (p53)  
++ HUIGDEX - This variable classifies the respondents based on their state of dexterity trouble. (p55)  
++ HUIDEMO - This variable classifies respondents based on emotional health status. (p55)  
++ HUIGHER - This variable classifies the respondents based on their hearing state. (p57)  
++ HUIGMOB - This variable classifies the respondents based on their state of mobility trouble. (p59)  
++ HUIGSPE - This variable classifies the respondents based on their state of speech trouble. (p60)  
++ HUIGVIS - This variable classifies the respondents based on their vision state. (p62) 
+
+Age: We are replacing each with mean of the age class
+```{r}
+lookup = data.frame(DHHGAGE=levels(hui$DHHGAGE), 
+                    meanAges=c(47, 52, 57, 62, 67, 72, 77, 82, 87))
+hui = dplyr::select(merge(hui, lookup, by="DHHGAGE"), -DHHGAGE)
+
+rm(lookup)
+```
+
+Emotional index, happy/not happy
+```{r}
+lookup = data.frame(HUIDEMO=levels(hui$HUIDEMO), 
+                    isHappy=c('Happy', 'Happy', 'Unhappy','Unhappy','Unhappy','Unhappy'))
+hui = dplyr::select(merge(hui, lookup, by="HUIDEMO"), -HUIDEMO)
+```
+
+Hearing State
+```{r}
+lookup = data.frame(HUIGHER=levels(hui$HUIGHER), 
+                    hearingState=c('Good', 'Bad', 'Good','Bad'))
+hui = dplyr::select(merge(hui, lookup, by="HUIGHER"), -HUIGHER)
+```
+
+Mobility Trouble
+```{r}
+lookup = data.frame(HUIGMOB=levels(hui$HUIGMOB), 
+                    mobilityHelp=c(T, F, F, F,T))
+hui = dplyr::select(merge(hui, lookup, by="HUIGMOB"), -HUIGMOB)
+```
+
+Vision State
+```{r}
+lookup = data.frame(HUIGVIS=levels(hui$HUIGVIS), 
+                    visualProb=c(T, T, F, F))
+hui = dplyr::select(merge(hui, lookup, by="HUIGVIS"), -HUIGVIS)
+rm(lookup)
+```
+
+We can also see that both HUIGDEX and HUIGSPE are highly biased towards one particular class
+```{r}
+table(hui$HUIGDEX)
+table(hui$HUIGSPE)
+```
+
+Therefore we remove these columns with high bias from our dataset:
+```{r}
+hui = dplyr::select(hui, -c(HUIGDEX, HUIGSPE))
+```
+
+The final dataset looks like this:
+```{r}
+summary(hui)
+```
+
+### Train Test Split 
+
+The dataset is split into 70/30 ratio
+```{r}
+## 70% of the sample size
+smp_size <- floor(0.70 * nrow(hui))
+
+## set the seed to make your partition reproducible
+set.seed(19)
+train_ind <- sample(seq_len(nrow(hui)), size = smp_size)
+
+hui.train <- hui[train_ind, ]
+hui.test <- hui[-train_ind, ]
+
+rm(smp_size)
+```
+
+### Model Fitting & Analysis
+
+##### Logistic Regression without any subset selection on the test dataset
+```{r}
+full.model.glm <- glm(HUIDCOG ~ ., data=hui.train, family = binomial())
+summary(full.model.glm)
+```
+Other than DHH_SEXMALE, every other predictor looks significant.
+
+Subset Selection using forward/backward and stepwise
+```{r}
+cfits.fwd <- regsubsets(HUIDCOG ~ .,data=hui.train, method="forward")
+plot(cfits.fwd,scale="Cp")
+rm(cfits.fwd)
+```
+
+Forward subset selection method concurs the finding in the Logistic Regression summary above, DHH_SEXMALE is still something we can get rid of. Also We get the same kind of result using the backward and seqrep method as well, so its not included.
+
+Based on these analysis, we are going with the following reduced subset of independent variables - isHappy, mobilityHelp, hearingState, meanAges & visualProb.
+```{r}
+final.model.FUN <- (HUIDCOG ~ isHappy + mobilityHelp + hearingState + meanAges + visualProb)
+```
+
+#### We can now build our first logistic regression model
+```{r}
+small.model.glm <- glm(final.model.FUN,data=hui.train, family = binomial())
+```
+
+Is this model any better than the full model that we had earlier?
+```{r}
+# Anova Test will tell us
+anova(full.model.glm, small.model.glm, test ="Chisq")
+```
+
+We can accept the null hypothesis that these 2 models are the basically the same. But going by the parsimony, we will choose the lighter model.
+
+So we can now do some prediction and see how good our model is
+```{r, fig.height=3, fig.width= 3}
+pred <- predict(small.model.glm, hui.test)
+pred_class <- ifelse(pred > 0.5, 1, 0)
+roc.curve <- roc(hui.test$HUIDCOG, pred, direction="<")
+print(roc.curve)
+plot(roc.curve,col="blue", lwd=5)
+```
+
+```{r, echo=F}
+#consfusion matrix
+cm <- caret::confusionMatrix(hui.test$HUIDCOG, pred_class)
+cm
+
+knitr::kable(
+  getCMMeasurements(cm),
+  caption = 'Logistic Regression Metrics'
+)
+```
+
+Based on this we can see that our accuracy for this model is 70.03% while the calculated sensitivity is 49% & the specificity is 73%. Our Area under the ROC curve is 62.26%
+
+Does KFold Cross Validation makes our prediction better? I have written a small function following the lecture notes to implement it. Here we do a 10 fold cross validation.
+```{r}
+set.seed(19)
+k_fold <- 10
+cv.err <- rep(NA,k_fold)
+cv.sen <- rep(NA,k_fold)
+cv.spec <- rep(NA,k_fold)
+
+#Randomly shuffle the data
+hui<-hui[sample(nrow(hui)),]
+#Create 10 equally size folds
+folds <- cut(seq(1,nrow(hui)),breaks=10, labels=FALSE)
+#Perform 10 fold cross validation
+for(i in 1:k_fold){
+  #Segement your data by fold using the which() function 
+  testIndexes <- which(folds==i, arr.ind=TRUE)
+  testData <- hui[testIndexes, ]
+  trainData <- hui[-testIndexes, ]
+  #Use the test and train data partitions however you desire...
+  model <- glm(final.model.FUN, data=trainData, family = binomial())
+  pred <- predict(model, testData)
+  pred_class <- ifelse(pred > 0.5, 1, 0)
+  cm <- confusionMatrix(testData$HUIDCOG, pred_class)
+  cv.err[i] <- cm$overall[[1]]
+  cv.sen[i] = cm$byClass[[1]]
+  cv.spec[i] = cm$byClass[[2]]
+}
+
+# print(mean(cv.err))
+result <- data.frame(mean(cv.err), mean(cv.sen), mean(cv.spec))
+colnames(result) <- c('accuracy','sensitivity', 'specificity')
+knitr::kable(
+  result,
+  caption = 'K-Fold Cross Validation Result for Logistic Regression'
+)
+```
+
+Due to computational complexity, I have not performed K-Fold cross validation for all of the models discussed here.
+
+#### Linear Discriminant Analysis:
+```{r}
+lda.model <- lda(final.model.FUN, data=hui.train)
+lda.pred <- predict(lda.model, hui.test, type= 'class')
+pred_class <- lda.pred$class
+plot(lda.model)
+```
+
+```{r, echo=F}
+#consfusion matrix
+cm <- caret::confusionMatrix(hui.test$HUIDCOG, pred_class)
+
+knitr::kable(
+  getCMMeasurements(cm),
+  caption = 'LDA Metrics'
+)
+```
+
+We get a slightly better accuracy and sensitivity but the specificity dropped compared to logistic regression.
+
+#### Quadratic Discriminant Analysis
+```{r}
+qda.model <- qda(final.model.FUN, data=hui.train)
+qda.pred <- predict(qda.model, hui.test, type= 'class')
+pred_class <- qda.pred$class
+```
+
+```{r, echo=F}
+#consfusion matrix
+cm <- caret::confusionMatrix(hui.test$HUIDCOG, pred_class)
+
+knitr::kable(
+  getCMMeasurements(cm),
+  caption = 'QDA Metrics'
+)
+```
+
+The QDA apparently don't promise any improvement over other models. 
+
+#### Random Forest:
+```{r}
+set.seed(19)
+tr <- randomForest::randomForest(final.model.FUN, data=hui.train, 
+                   ntree = 100, mtry= 5)
+pred_class <- predict(tr, hui.test, type= 'class')
+```
+
+```{r, echo=F}
+#consfusion matrix
+cm <- caret::confusionMatrix(hui.test$HUIDCOG, pred_class)
+
+knitr::kable(
+  getCMMeasurements(cm),
+  caption = 'Random Forest Metrics'
+)
+```
+
+So far Random Forest have the best accuracy and sensitivity.
+
+#### General Additive Model
+
+Generalized additive models (GAMs) extend a standard linear model by allowing non-linear functions of each of the variables, while maintaining additivity. In this problem, upon further analysis, we extended non-linearity to one of the predictor meanAges by adding spline function to it since its non-linear form appears statistically significant.
+```{r}
+gam.fit <- gam(HUIDCOG ~ isHappy + mobilityHelp + hearingState + s(meanAges,2),
+           data=hui.train,family=binomial)
+summary(gam.fit)
+```

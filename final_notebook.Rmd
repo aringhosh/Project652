@@ -7,6 +7,8 @@ output: html_notebook
 library(dplyr, quietly = T)
 library(caret, quietly = T)
 library(MASS, quietly = T)
+library(pROC, quietly = T)
+library(randomForest, quietly = T)
 ```
 
 ```{r}
@@ -114,7 +116,7 @@ anova(full.model,small.model,test ="Chisq")
 
 GLM ROC Curve
 ```{r}
-library(pROC)
+
 pred <- predict(small.model, hui.test)
 roc(hui.test$HUIDCOG, pred, direction="<")
 plot(roc(hui.test$HUIDCOG, pred, direction="<"),col="yellow", lwd=3)
@@ -130,9 +132,24 @@ lda.pred <- predict(lda.model, hui.test)
 pred_class <- lda.pred$class
 confusionMatrix(hui.test$HUIDCOG, pred_class)
 ```
+```{r}
+# side note function
+fun1 <- function(cm){
+  accuracy = cm$overall[[1]]
+  sensitivity = cm$byClass[[1]]
+  specificity = cm$byClass[[2]]
+  result <- as.data.frame(c(accuracy, sensitivity, specificity))
+  rownames(result) <- c('accuracy', 'sensitivity', 'specificity')
+  colnames(result) <- 'values'
+  return(result)
+}
+cm <- confusionMatrix(hui.test$HUIDCOG, pred_class)
+print(fun1(cm))
+```
+
+
 RF Tree:
 ```{r}
-library(randomForest)
 tr <- randomForest(HUIDCOG ~ ., data=hui.test, 
                    ntree = 500, mtry=2,importance=TRUE)
 pred <- predict(tr, hui.test)
