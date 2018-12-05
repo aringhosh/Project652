@@ -196,20 +196,36 @@ Logistic regression model is used to predict the test data as well as the valida
 
 This sections shows the various models that we tried along with Logistic Regression model that was ultimately selected. The classification was model was build on 70% of the available data and 30% of the data was used for testing. Different metric that are used to compare the models are discussed in the following:
 
-**Mis-classification Error:** The number of observations that were predicted wrongly by the model. It is the
+**Misclassification Error:** The number of observations that were predicted wrongly by the model. It is the
 proportion of misclassified observations.
 
 **Sensitivity:** It is the ability of a model to correctly identify those with diabetic disease. It is observed True positive rate. TP/(TP+FN) where TP is True Positive and FN is False Negative.
 
 **Specificity:** It is the ability of a model to correctly identify those without diabetic disease. It is observed True negative rate. TN/(TN+FP) where TP is True Negative and FP is False Positive.
 
-**Area Under Curve ( AUC):** It is a measure of the overall performance of the classifier. If it is close to
-one, then model is performing as good as the real truth. On the other hand, if AUC is 0.5, then model would
-perform no better than null classifier.
 
-```{r}
-# ToDO different models
+```{r, echo=FALSE}
+# TODO different models
+method = c('Logistic Regression', 'LDA', 'QDA', "Random Forest")
+accuracy = c(0.7003333, 0.7088333, 0.6938333, 0.707)
+sensitivity = c(0.4978903, 0.5521064, 0.4805781, 0.5461538)
+specificity = c(0.7383215, 0.7215715, 0.7420805, 0.7181818) 
+lookup = data.frame(method, accuracy, specificity, sensitivity, row.names = NULL)
+knitr::kable(
+  lookup,
+  caption = 'Model Comparison - Predicting HUIDCOG'
+)
 ```
+
+
+#### Evaluation of best model on the Holdout dataset
+
+Once I finalized the model, I have re-fit the model on the full dataset (without any tran-test split) and then used the holdout dataset to measure the accuracy, sensitivity & specificity which I got is :
+
+  * accuracy : 0. 70  
+  * sensitivity : 0.502  
+  * specificity : 0.729  
+
 
 ## Conclusion and Discussion
 
@@ -228,7 +244,7 @@ This section mainly deals with the code base that was used for the analysis part
 
 ### Data Loading:
 Load all the required packages and some helper functions
-```{r library_chunk}
+```{r library_chunk, echo = T, results = 'hide', warning=FALSE, message=F}
 library(dplyr, quietly = T)
 library(caret, quietly = T)
 library(MASS, quietly = T)

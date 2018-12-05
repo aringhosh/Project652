@@ -1,0 +1,177 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r, echo=FALSE}
+library(data.table, quietly = T)
+hs <- fread("HStrain.csv", stringsAsFactors = T)
+```
+
+MCA::
+All columns that start's wih some prefix:
+```{r}
+library(FactoMineR)
+library("factoextra")
+plotMCA <- function(prefix){
+  # prefix = 'CIH'
+  cat(cn[startsWith(cn,prefix)])
+  res.mca <- MCA(select(hs,starts_with(prefix)), ncp = 10, graph = F)
+  fviz_screeplot(res.mca, addlabels = TRUE)
+}
+# plotMCA("CIH") # take
+# plotMCA("DS2") # take
+```
+
+
+```{r}
+cn <- colnames(hs)
+length(unique(substr(cn,start=1,stop=3)))
+table(substr(cn,start=1,stop=3))
+```
+
+```{r}
+library(dplyr)
+hs <- dplyr::select(hs,-starts_with("ADM"))
+```
+
+
+selected columns:
+```{r}
+hsred <- dplyr::select(hs, 
+ADLDCLS, # Instrumental and Basic Activities of Daily Living Classification
+ALCDTTM, # Type of Drinker
+CAGDFAP, #This variable indicates the frequency of assistance provided by the respondent to the main care recipient
+CCCF1, # Has a Chronic Condition
+CCCDCPD, #Has Chronic Obstructive Pulmonary Disease
+CR1FRHC,# Flag for Receiving Formal Home Care Services 
+CR2DTHC, # Receipt of Formal or Informal Home Care
+CR2DFAR, # Frequency of Assistance Received from the Main Caregiver (for the main source of assistance)
+DPSDSF, # Depression Scale - Probability of Caseness to Respondents
+EDUDR04, # Highest Level of Education - Household, 4 Levels
+FALG02, # Number of falls - past 12 months - grouped
+GENDHDI, # Perceived Health
+GENDMHI, # Perceived Mental Health
+HC2FCOP, # Flag for Consultation with Health Professional
+HUPDPAD, # Health Utilities Index
+HWTGBMI, # Body mass index - grouped
+IN2GHH, # Total Household Income - All Sources - grouped
+LONDSCR, # Three Item Loneliness Scale - Score
+MEDF1, # Flag Indicating Medication Use (Past Month)
+NURDHNR, # High Nutritional Risk
+PA2DSCR, # PASE Score
+SLSDCLS, # Satisfaction with Life Scale
+SMKDSTY, # Number of Years Since Stopped Smoking Completely
+SPAFPAR, # Frequency of Community-Related Activity Participation (participant)
+GEOGCMA2, # Metropilitan Area - 
+HUIDHSI # response
+)
+
+# CIH first 5 dimensions explains about 50%
+res.mca <- MCA(select(hs,starts_with("CIH")), ncp = 10, graph = F)
+CIHPCs <- res.mca$ind$coord[,1:4] # first 4 explain 50% 
+colnames(CIHPCs) <- paste("CIH",colnames(CIHPCs))
+
+
+# DS2 first 7 dimensions explains about 50%
+res.mca <- MCA(select(hs,starts_with("DS2")), ncp = 10, graph = F)
+DS2PCs <- res.mca$ind$coord[,1:7] # first 4 explain 50% 
+colnames(DS2PCs) <- paste("DS2",colnames(DS2PCs))
+
+hsred <- data.frame(hsred,CIHPCs, DS2PCs)
+
+dim(hsred)
+```
+
+
+
+Subset Selection
+```{r}
+library(leaps)
+tem <- model.matrix(HUIDHSI ~ .,data=hsred)[,-1]
+X <- as.data.frame(scale(tem))
+Y <- hsred$HUIDHSI # could also scale Y, but we won't
+```
+
+
+
+```{r}
+set.seed(19)
+n.train <- 7000
+train <- sample(1:nrow(hs),replace=FALSE,size=n.train) 
+X.train <- X[train,] 
+Y.train <- Y[train]
+X.test <- X[-train,]
+Y.test <- Y[-train]
+```
+
+Regression Subset:
+```{r}
+library(leaps)
+rr <- regsubsets(X.train,Y.train,nvmax=30, method="forward")
+ss <- summary(rr)
+pbest <- which.min(ss$bic) 
+pbest
+```
+
+```{r}
+cols<- ss$which[pbest,-1] # don't include intercept 
+Xred <- as.matrix(X.test[,cols])
+pred.test <- cbind(1,Xred) %*% coef(rr,id=26) 
+mean((Y.test - pred.test)^2)
+```
+
+Lasso
+```{r}
+library(glmnet)
+lambdas <- 10^{seq(from=-3,to=5,length=100)}
+cv.lafit <- cv.glmnet(as.matrix(X.train),Y.train,alpha=1,lambda=lambdas)
+la.best.lam <- cv.lafit$lambda.1se
+ll <- glmnet(as.matrix(X.train),Y.train,alpha=1,lambda=la.best.lam)
+pred.test <- predict(ll,as.matrix(X.test)) 
+mean((Y.test-pred.test)^2)
+```
+
+```{r}
+nonz <- (as.numeric(coef(ll))!=0)[-1] # rm intercept
+hsred2.train <- data.frame(HUIDHSI=Y.train,X.train[,nonz])
+hsred2.test <- data.frame(HUIDHSI=Y.test,X.test[,nonz])
+
+# all names
+names = colnames(as.matrix(X.train))
+
+```
+
+
+Linear regression:
+
+```{r}
+
+linear.fit <- lm(HUIDHSI ~ ., data = hsred2.train)
+preds <- predict(linear.fit, newdata = hsred2.test)
+with(hsred2.test, mean((hsred2.test$HUIDHSI-preds)^2))
+```
+
+Random Forest:
+```{r}
+library(randomForest)
+set.seed(1)
+bb <- randomForest(X.train,y=Y.train,xtest=X.test,
+          ytest=Y.test,ntree=200,
+mtry=sqrt(ncol(X.train)),importance=TRUE) 
+# varImpPlot(bb,type=1) # HUPDPAD levels 4,5,3 important
+pred.test <- bb$test$predicted 
+mean((Y.test - pred.test)^2)
+```
+
+GBM:
+```{r}
+library(gbm)
+hs.train <- data.frame(HUIDHSI=Y.train,X.train) 
+hboost <- gbm(HUIDHSI ~ ., data=hs.train,n.trees=200,interaction.depth=2, distribution="gaussian")
+hs.test <- data.frame(HUIDHSI=Y.test,X.test)
+pred.test <- predict(hboost,newdata=hs.test, n.trees=200,type="response") 
+mean((Y.test-pred.test)^2)
+```
+
