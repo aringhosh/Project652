@@ -360,7 +360,7 @@ mean((Y.test - pred.test)^2)
 ```
 
 #### GBM
-```{r, eval=FALSE}
+```{r}
 hs.train <- data.frame(HUIDHSI=Y.train,X.train) 
 hboost <- gbm(HUIDHSI ~ ., data=hs.train ,n.trees=400,
               interaction.depth=5, distribution="gaussian")
