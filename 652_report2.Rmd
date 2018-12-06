@@ -228,7 +228,6 @@ FALG02, # Number of falls - past 12 months - grouped
 GENDHDI, # Perceived Health
 GENDMHI, # Perceived Mental Health
 HC2FCOP, # Flag for Consultation with Health Professional
-# HUPDPAD, # Health Utilities Index
 HWTGBMI, # Body mass index - grouped
 IN2GHH, # Total Household Income - All Sources - grouped
 LONDSCR, # Three Item Loneliness Scale - Score
