@@ -161,7 +161,7 @@ In order to evaluate different models that I build, I used the measurement of ro
 
 Here are the three MSE that I have got for different models that are trained with the train set and evaluated on the test set: 
 ```{r, echo=F}
-lookup = data.frame(t(c(0.01259476, 0.01417913, 0.03846411)))
+lookup = data.frame(t(c(0.02541022, 0.01417913, 0.03846411)))
 rownames(lookup) = NULL
 colnames(lookup) = c("Linear Reg", "Random Forest", "Gradient Boosting Method")
 knitr::kable(
@@ -228,7 +228,7 @@ FALG02, # Number of falls - past 12 months - grouped
 GENDHDI, # Perceived Health
 GENDMHI, # Perceived Mental Health
 HC2FCOP, # Flag for Consultation with Health Professional
-HUPDPAD, # Health Utilities Index
+# HUPDPAD, # Health Utilities Index
 HWTGBMI, # Body mass index - grouped
 IN2GHH, # Total Household Income - All Sources - grouped
 LONDSCR, # Three Item Loneliness Scale - Score
@@ -300,7 +300,7 @@ ss <- summary(rr)
 pbest <- which.min(ss$bic) 
 cols<- ss$which[pbest,-1] # don't include intercept 
 Xred <- as.matrix(X.test[,cols])
-pred.test <- cbind(1,Xred) %*% coef(rr,id=26) 
+pred.test <- cbind(1,Xred) %*% coef(rr, id=pbest) 
 
 ```
 
