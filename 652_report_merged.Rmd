@@ -1,7 +1,7 @@
 ---
 title: "STAT 652 Final Project"
 author: "Arin Ghosh"
-date: "12/1/2018"
+date: "12/5/2018"
 output: pdf_document
 ---
 
@@ -13,7 +13,8 @@ library(knitr)
 
 ## Introduction
 
-This is an analysis report of the data provided by the Canadian Community Health Survey (CCHS) – Healthy Aging module. The project is divided into 2 parts corresponding to two separate datasets provided to us. The first dataset has 20000 rows and 9 columns. In this dataset problem our task is to predict cognitive health index called HUIDCOG using 8 other health-utility-index (HUI) variables. In the second part of the project, we are tasked with building a regression model that predicts a real number called HUIDHSI, which is another measure of the HUI that provides a description of an individual’s overall functional health. The second dataset is much bigger in size compared to the first dataset, having 590 variables with 10000 rows. A part of the dataset is held out for validation purpose which was released to the students at a later date.
+This is an analysis report of the data provided by the Canadian Community Health Survey (CCHS) – Healthy Aging module. The project is divided into 2 parts corresponding to two separate datasets provided to us. The first dataset has 20000 rows and 9 columns. In this dataset, our task is to predict cognitive health index called HUIDCOG using 8 other health-utility-index (HUI) variables. In the second part of the project, we are tasked with building a regression model that predicts a real number called HUIDHSI, which is another measure of the HUI that provides a description of an individual’s overall functional health.  
+The second dataset is much bigger in features size compared to the first dataset, having 590 variables with 10000 rows. A part of the dataset is held out for validation purpose which was released to the students at a later date.
 
 ## Part 1: Predicting HUIDCOG (Classification Analysis)
 
@@ -26,7 +27,7 @@ hui <- read.csv("hui.csv")
 summary(hui)
 ```
 
-From the summary of the hui dataset, we can see that there are a total of 9 columns that exists. Further, we see from the summary that there are no NA or missing values, although there are several entries with value 'NOT STATED'. Also it is noteworthy to mention that none of the variables are continuous variables and the value which we are suppose to predict is a multivariate i.e. HUIDCOG can take one of the possible 7 values for each set of dependent variables. Although the dataset appear to be clean and variables are grouped, we will still need to do some analysis and take a look if we can reduce possible number of outcomes for each column without loosing a lot of quality in the dataset where it makes sense.
+From the summary of the hui dataset, we can see that there are a total of 9 columns that exists. Further, we see from the summary that there are no NA or missing values, although there are several entries with value 'NOT STATED'.  Also, it is noteworthy to mention that none of the variables are continuous variables and the value which we are supposed to predict is a multivariate i.e. HUIDCOG can take one of the possible 7 values for each set of dependent variables. Although the dataset appears to be clean and variables are grouped, we will still need to do some analysis and take a look if we can reduce the possible number of outcomes for each column without losing a lot of quality in the dataset where it makes sense.
 
 ### 1.2 Exploratory Data Analysis & Data Grouping
 
@@ -38,8 +39,8 @@ hui <- hui[hui$HUIDCOG!= 'NOT STATED',]
 hui$HUIDCOG <- factor(hui$HUIDCOG)
 ```
 
-#### Target Variabe:
-The given dataset is a fully categorical mulltivariate dataset meaning there are no columns with real numbers. This is something that is not extinsively discussed in our class, although we've been tought how to deal with categorical data in general. Since multivariate analysis is not extensively covered in the coursework, I am going to reduce the possible outcome of our dependent variable HUIDCOG from 6 to 2. To come up with a meaningful division, we must refer to the original documentation provided by the instructor. If we take a look into page 53 of CCHS_HA_Derived_variables.pdf then we can find out how these 6 different classes of HUIDCOG came into existence. For our analysis purpose I have divided our target variable HUIDCOG into a binary response where 1 refers to the patient is healthy in terms of cognitive abilities and 0 is unhealthy. We assign 1 if the patient is able to think clearly and solve day to day problems (COG. ATT. LEVE 1) and assign a 0 otherwise since in any other case it indicates some kind of issues with the patient's cognitive health abilities.
+#### Target Variable:
+The given dataset is a fully categorical multivariate dataset meaning there are no columns with real numbers. This is something that is not extensively discussed in our class, although we've been taught how to deal with categorical data in general. Since multivariate analysis is not extensively covered in the coursework, I am going to reduce the possible outcome of our dependent variable HUIDCOG from 6 to 2. To come up with a meaningful division, we must refer to the original documentation provided by the instructor. If we take a look into page 53 of CCHS_HA_Derived_variables.pdf then we can find out how these 6 different classes of HUIDCOG came into existence. For our analysis purpose, I have divided our target variable HUIDCOG into a binary response where 1 refers to the patient is healthy in terms of cognitive abilities and 0 is unhealthy. We assign 1 if the patient is able to think clearly and solve day to day problems (COG. ATT. LEVE 1) and assign a 0 otherwise since in any other case it indicates some kind of issues with the patient's cognitive health abilities.
 ```{r}
 hui$HUIDCOG = ifelse(hui$HUIDCOG=='COG. ATT. LEVE 1', 1, 0)
 ```
@@ -61,10 +62,10 @@ hui = dplyr::select(hui, -c(HUIGDEX, HUIGSPE))
 
 #### Dependent Variable Group Collapsing:
 
-Furthermore, I have tried to reduce the number of groups for each of the remaining 6 variables to some degree where it makes sense. For example, instead of using 4 possible classes of HUIGHER, which classifies the respondents based on their hearing state, I have collapsed it into 2, marking HUIGHER as Good if there was a history of hearing problem (whether or not its corrected currently) or otherwise Bad there was no hearing complains ever for that particular patient. Below is a summary of the collapsing decisions that has been made in this analysis.
+Furthermore, I have tried to reduce the number of groups for each of the remaining 6 variables to some degree where it makes sense. For example, instead of using 4 possible classes of HUIGHER, which classifies the respondents based on their hearing state, I have collapsed it into 2, marking HUIGHER as BAD if there was a history of hearing problem (whether or not its corrected currently) or otherwise GOOD if there was no hearing complains ever for that particular patient. Below is a summary of the collapsing decisions that have been made in this analysis.
 
 ##### HUIDEMO : Emotional index
-This variable classifies respondents based on emotional health status. The original record has 6 different levels based on different levels of emotional response. But we can reduce it to Happy or Unhappy based on broader definition. I have converted all of NOT STATED as Unhappy.
+This variable classifies respondents based on emotional health status. The original record has 6 different levels based on different levels of emotional response. But we can reduce it to Happy or Unhappy based on the broader definition. I have converted all of NOT STATED as Unhappy.
 ```{r, echo=F}
 lookup = data.frame(HUIDEMO=levels(hui$HUIDEMO), isHappy=c('Happy', 'Happy', 'Unhappy','Unhappy','Unhappy','Unhappy'))
 hui = dplyr::select(merge(hui, lookup, by="HUIDEMO"), -HUIDEMO)
@@ -80,7 +81,7 @@ knitr::kable(
 This variable classifies respondents based on hearing state of the patient. As explained earlier, the original 4 possible classes are reduced to a broader 2 general classes of Good or Bad indicating if the patient has a history of hearing issues.
 ```{r, echo=F}
 lookup = data.frame(HUIGHER=levels(hui$HUIGHER), 
-                    hearingState=c('Good', 'Bad', 'Good','Bad'))
+                    hearingState=c('Good', 'Good', 'Bad','Bad'))
 hui = dplyr::select(merge(hui, lookup, by="HUIGHER"), -HUIGHER)
 
 knitr::kable(
@@ -142,14 +143,12 @@ summary(hui)
 
 ## 2 Methods
 
-In this part of the project, I have used some of the classification techniques that were taught over the course from Logistic Regression to Support Vector Machines. However for focussing on one technique, **Logistic Regression** is preferred which is interpretable and gives a low missclassification error rate as well as decent Specificity and Sensitivity score. I have used the variable importance table from random forest models to select a subgroup of variables to further tune my models. I have attached the details into the **Appendix** section.
+In this part of the project, I have used some of the classification techniques that were taught over the course from Logistic Regression to Support Vector Machines. However, for focussing on one technique, **Logistic Regression** is preferred which is interpretable and gives a low misclassification error rate as well as decent Specificity and Sensitivity score. I have used the variable importance table from random forest models to select a subgroup of variables to further tune my models. I have attached the details into the **Appendix** section.
 
 ### 2.1 Logistic Regression
 
 Logistic Regression uses the logistic function fitted by **maximum likelihood**. It performs well even if the predictors do not follow Gaussian distribution. The model is a linear model in the log-odds of success
-$$ \log \left( \frac{p(X)}{1-p(X)} \right) = 
-X \beta = \beta_0 + X_1 \beta_1 + \ldots + 
-X_p \beta_p. $$
+$$ \log \left( \frac{p(X)}{1-p(X)} \right) = \beta_0 + X_1 \beta_1 + \ldots + X_p \beta_p $$
 
 Since our dependent variable takes a 0/1 binary response, we can use this model. Unlike linear regression where one unit change in the predictor variable (X) results in one unit change in Y, here one unit increase in $X_j$ , while holding all others fixed is associated with a $\beta_j$ change in the log-odds.
 
@@ -186,11 +185,11 @@ confusionMatrix(hui$HUIDCOG, pred_class)
 ### 3.1 Model Interpretation
 
 On examining the fitted logistic regression model summary above, we can see that all the predictors are **statistically significant** with p-values far less than required 5%. These results also concur with the findings that predictors such as HUIGDEX, HUIGSPE, and DHH_SEX are not very significant predictors in determining a respondents cognitive health state. When we compare the full model of all available variables *(DHH_SEX + meanAges + isHappy + hearingState + mobilityHelp + visualProb)* with that of a model build on the subset of 4 predictors $(isHappy + mobilityHelp + hearingState + meanAges)$  using Anova chisq test, a small p-value $(7.693e-08) < 0.05$ indicated that both models are similar - thus parsimoniously we chose the smaller model. Also, we have checked with various available logistic  regression model selection techniques such as best subset, forward, backward and step-wise selection, all of them pointed to the four predictors that was used in the final model build. Therefore the final model that we've selected for predicting **HUIDCOG** is: $$ y_i = \beta_0 + isHappy * \beta_1 + mobilityHelp * \beta_2 + hearingState * \beta_3 + meanAges * \beta_4 $$
-We can interprete the model in this way: If a respondent reported that (s)he requires mobility help == 1, keeping other predictor unchanged, that can be associated with an estimated increase of (-0.53) units in the log-odds of the respondent being cognitively healthy. We can see from the Table 7 that it is estimated that if the respondent is classified as happy or need no mobility help or has a good hearing state or is younger (selecting any one of these predictor while not changing the others) it generally is an indication of the respondent is cognitively healthy, which makes sense. Now we can not only point out which predictor is associated with diminishing cognitive ability but we can also indicate more relevant statistics which is by how much units they affect the mental state of the patients.
+We can interpret the model in this way: If a respondent reported that (s)he requires mobility help == 1, keeping other predictors unchanged, that can be associated with an estimated increase of (-0.53) units in the log-odds of the respondent being cognitively healthy. We can see from the Table 7 that it is estimated that if the respondent is classified as happy or need no mobility help or has a good hearing state or is younger (selecting any one of these predictors while not changing the others) it generally is an indication of the respondent is cognitively healthy, which makes sense. Now we can not only point out which predictor is associated with diminishing cognitive ability but we can also indicate more relevant statistics which is by how much units they affect the mental state of the patients.
 
 #### 3.2 Model Evaluation
 
-Logistic regression model is used to predict the test data as well as the validation dataset that was released later to the students. We have used various statistical measures to measure the effectiveness of this model such as missclassification rate, sensitivity, specificity and Area under the ROC curve. We have also tried k fold cross validation on the training data set. Below is a graph that shows the ROC curve plot that is derived on the test dataset. The value of Area under the ROC curve we got is ~0.61. Based on various cut-off values, we found a cut-off of 0.5 leads to the best balance of accuracy, sensitivity and specificity. Please refer to the Appendix for further details on this section's derivations. 
+A *logistic regression* model is used to predict the test data as well as the validation dataset that was released later to the students. We have used various statistical measures to measure the effectiveness of this model such as misclassification rate, sensitivity, specificity and Area under the ROC curve. We have also tried k fold cross-validation on the training data set. Below is a graph that shows the ROC curve plot that is derived on the test dataset. The value of Area under the ROC curve we got is ~0.61. Based on various cut-off values, we found a cut-off of 0.5 leads to the best balance of accuracy, sensitivity, and specificity. Please refer to the Appendix for further details on this section's derivations. 
 
 #### 3.3 Comparisons of Classification Models
 
@@ -217,11 +216,14 @@ knitr::kable(
 )
 ```
 
+I have picked the final model which shows a good balance of all of these 3 measurements. Since accuracy itself cannot be a good criterion for selecting the best model. The case of a good sensitivity & specificity should also matter since this is a medical dataset where the cost of wrongly predicting something is often high. 
+
+Therefore I have chosen the **Logistic Regression** as my final model for Part I.
 
 #### Evaluation of best model on the Holdout dataset
 
-Once I finalized the model, I have re-fit the model on the full dataset (without any tran-test split) and then used the holdout dataset to measure the accuracy, sensitivity & specificity which I got is :
-
+Once I finalized the model, I have re-fit the model on the full dataset (without any tran-test split) and then used the holdout dataset to measure the accuracy, sensitivity & specificity which I got is :  
+  
   * accuracy : 0. 70  
   * sensitivity : 0.502  
   * specificity : 0.729  
@@ -229,7 +231,7 @@ Once I finalized the model, I have re-fit the model on the full dataset (without
 
 ## Conclusion and Discussion
 
-After going through all the models, we have picked the logistic regression model with four predictors as our final selected model. However we have only considered linear terms in this model, which can be a drawback in this model. Therefore in the future it will be noteworthy to check how adding interaction and non-linear terms changes the predictive ability of the logistic regression model, or if there are any other family of classification techniques stands out when these new terms are introduced. We can try for even more powerful models such as deep neural networks to see if that helps us to give a better result. Finally all these discussions are based on the dataset that was provided to us. The correctness of this model will change as new data are available to us in the future, so that we might have to tune it later.
+After going through all the models, we have picked the logistic regression model with four predictors as our final selected model. However, we have only considered linear terms in this model, which can be a drawback in this model. Therefore in the future, it will be noteworthy to check how adding interaction and non-linear terms changes the predictive ability of the logistic regression model, or if there are any other families of classification techniques stands out when these new terms are introduced. We can try for even more powerful models such as deep neural networks to see if that helps us to give a better result. Finally, all these discussions are based on the dataset that was provided to us. The correctness of this model will change as new data are available to us in the future so that we might have to tune it later.
 
 \newpage
 
@@ -548,9 +550,9 @@ __End Of Part 1__
 
 ### 1.1 Data Loading
 
-Again the first step is to load the appropriate dataset into the R Studio environment. The dataset can be found on the project github repository. Once downloaded in to the working directory of the R Studio, we can load the data using read.csv() command. Since the data file is big, I have used the ```data.table``` library to load the data quickly. It is generally faster than the ```read.csv()``` that is found in the base model. One difference between the default read.csv() and ```data.table::fread()``` is that we need to explicitly pass ```stringAsFactor``` in order to make sure that the data is read properly.
+Again the first step is to load the appropriate dataset into the R Studio environment. The dataset can be found on the project GitHub repository. Once downloaded into the working directory of the R Studio, we can load the data using read.csv() command. Since the data file is big, I have used the ```data.table``` library to load the data quickly. It is generally faster than the ```read.csv()``` that is found in the base model. One difference between the default read.csv() and ```data.table::fread()``` is that we need to explicitly pass ```stringAsFactor``` in order to make sure that the data is read properly.
 
-```{r}
+```{r, results = 'hide', warning=FALSE, message=F}
 library(data.table, quietly = T)
 hs <- fread("HStrain.csv", stringsAsFactors = T)
 dim(hs)
@@ -560,15 +562,15 @@ cn <- colnames(hs)
 table(substr(cn,start=1,stop=3))
 ```
 
-We can quickly see that there are 10000 rows while the number of columns are 591. We can also see that a total of 38 diffrent measurements that are represented in the dataset and each group (except 3) further subdivided into subgroups. Therefore we spend a considerable amount of time trying to figure out how can we reduce this number to something that is managable while keeping the overall variance of the data set intact. Upon a careful look we can see that there are some variables that are used for record keeping (ID type) and kept it in the data set for administrative purposes (e.g. group of variables starts with "ADM"), we need to first remove it.
+We can quickly see that there are 10000 rows while the number of columns is 591. We can also see that a total of 38 different measurements that are represented in the dataset and each group (except 3) further subdivided into subgroups. Therefore we spend a considerable amount of time trying to figure out how can we reduce this number to something that is manageable while keeping the overall variance of the data set intact. Upon a careful look, we can see that there are some variables that are used for record keeping (ID type) and kept it in the data set for administrative purposes (e.g. group of variables starts with "ADM"), we need to first remove it.
 
-In class we've taught about the 'curse of dimensionality' which states that the more dimensions you work with, the less effective standard computational and statistical techniques become. This has repercussions that need some serious workarounds when machines are dealing with Big Data. In general, I have used the following techniques to reduce the number of predictors from what was given to us to start with  
+In class, we've taught about the 'curse of dimensionality' which states that the more dimensions you work with, the less effective standard computational and statistical techniques become. This has repercussions that need some serious workarounds when machines are dealing with Big Data. In general, I have used the following techniques to reduce the number of predictors from what was given to us to start with  
   
-  * Step 1: I have gone through the details of the data documentation that was given to us. The document shows that some group of variables are summarized as a single variable. I have chosen those variables since they represent a good balance of the group of variables without loosing a lot of variability. For example, ADLDCLS is an overall summary measurement of Instrumental and Basic Activities of Daily Living for a respondent. Also not all of the data groups that we want to include, has a summary variable. So in that case we have derived Multiple Correspondence Analysis (MCA) (since they are categorical variables) and included the dimensions that are explaining the variables significantly. Please refer appendix for details
+  * Step 1: I have gone through the details of the data documentation that was given to us. The document shows that some group of variables is summarized as a single variable. I have chosen those variables since they represent a good balance of the group of variables without losing a lot of variabilities. For example, ADLDCLS is an overall summary measure of Instrumental and Basic Activities of Daily Living for a respondent. Also, not all of the data groups that we want to include, has a summary variable. So, in that case, we have derived Multiple Correspondence Analysis (MCA) (since they are categorical variables) and included the dimensions that are explaining the variables significantly. Please refer appendix for details
   * Step 2: Once we have finished filtering the columns manually by going through the dataset and through MCA technique, the next thing we want to do is to run a subset selection technique. We used two subset selection techniques 
       + Regression Subset Selection Technique - Forward, Backward, Mixed
       + Lasso Subset Selection - Used different lambda values and then selected the best lambda for which the mean error is the lowest. 
-      + Finally compared both of these techniques, and since Lasso gave me the best result, and went with the columns that was ultimately filtered out. 
+      + Finally compared both of these techniques, and since Lasso gave me the best result, and went with the columns that were ultimately filtered out. 
       
 After going through these process of predictor reduction, we finally choose 31 columns out of the possible 590 columns.
 
@@ -593,7 +595,8 @@ After going through these process of predictor reduction, we finally choose 31 c
 
 ## Methods
 
-Before we could run any model, we first need to split the dataset into train/test. For that I have used 70:30 split. Based on the filtered columns, I have build three regression models. They are:
+Before we could run any model, we first need to split the dataset into train/test. For that I have used 70:30 split. Based on the filtered columns, I have build three regression models. They are:  
+
   * Linear Regression
   * Random Forest
   * Gradient Boosting Model (GBM)
@@ -684,16 +687,16 @@ F-statistic: 589.8 on 31 and 6968 DF,  p-value: < 2.2e-16
 
 ```
 
-For the final linear regression model that I chose, all of the 31 predictors are significant except the Income column `(IN2GHH.80.000.OR.MORE)`. The calculated RMSE is 0.01259476 with Multiple R-Square value of 0.72 means this model explains 72% of the available data and a p-value of p-value: < 2.2e-16 which means its a significant model in predicting `PA2DSCR`. Lets take an example of how we can interprete this model and the relationship between the dependent and the independent  variable. For example we see the coefficient for `LONDSCR = -0.010775` in the model which means that for one unit increase in the Lonliness scale, keeping all other predictors constant, it contributes to -0.010775 times decrease in HUIDHSI score which means the more lonely the person is, the more unhealthy the person will become. So we can now not only measure qualitative relations but also quantitatively measure the relationship between the dependent and independent variables. We can also compare different predictors and say which predictor is more impacting in determining the `HUIDHSI` score.
-
+For the final linear regression model that I chose, all of the 31 predictors are significant except the Income column `(IN2GHH.80.000.OR.MORE)`. The calculated RMSE is 0.01259476 with Multiple R-Square value of 0.72 means this model explains 72% of the available data and a p-value of p-value: < 2.2e-16 which means its a significant model in predicting `PA2DSCR`. Let's take an example of how we can interpret this model and the relationship between the dependent and the independent variable. For example, we see the coefficient for `LONDSCR = -0.010775` in the model which means that for one unit increase in the Loneliness scale, keeping all other predictors constant, it contributes to -0.010775 times decrease in HUIDHSI score which means the more lonely the person is, the more unhealthy the person will become. So we can now not only measure qualitative relations but also quantitatively measure the relationship between the dependent and independent variables. We can also compare different predictors and say which predictor is more impacting in determining the `HUIDHSI` score.
+  
 
 ## Results
 
-In order to evaluate different models that I build, I used the measurement of root mean square error for the purpose since this is a regression problem, where we are predicting a real number rather than a categorical value. The root mean square derivation is frequently used in the world of statistics. Mean Square Error (MSE) is the variance of the residuals (prediction errors). Residuals are a measure of how far from the regression line data points are; RMSE is a measure of how spread out these residuals are. In other words, it tells you how concentrated the data is around the line of best fit. The lower the number, the better the model is. The minimum the RMSE can go is 0. Therefore a value very close to zero is considered a good model.
+In order to evaluate different models that I build, I used the measurement of mean square error (MSE) for the purpose since this is a regression problem, where we are predicting a real number rather than a categorical value. The mean square derivation is frequently used in the world of statistics. Mean Square Error (MSE) is the variance of the residuals (prediction errors). Residuals are a measure of how far from the regression line data points are; MSE is a measure of how spread out these residuals are. In other words, it tells you how concentrated the data is around the line of best fit. The lower the number, the better the model is. The minimum the MSE can go is 0. Therefore a value very close to zero is considered a good model (if that's not a overfit, which we make sure with test/holdout dataset)
 
 Here are the three MSE that I have got for different models that are trained with the train set and evaluated on the test set: 
 ```{r, echo=F}
-lookup = data.frame(t(c(0.02541022, 0.01417913, 0.03846411)))
+lookup = data.frame(t(c(0.02541022, 0.02662107, 0.04187508)))
 rownames(lookup) = NULL
 colnames(lookup) = c("Linear Reg", "Random Forest", "Gradient Boosting Method")
 knitr::kable(
@@ -710,7 +713,7 @@ Once I finalized the model, I have re-fit the model again on the full dataset (w
 
 ## Conclusion
 
-After going through all the models, we have picked the linear regression model with four predictors as our final selected model. However we have only considered linear terms in this model, which can be a drawback in this model. We also haven't extensively used K-Fold cross validation here due to time complexity. Therefore in the future it will be noteworthy to check how adding interaction and non-linear terms and doing K-fold CV changes the predictive ability of all these models that I have tried, or if there is any other family of regression techniques stands out when these new terms / new data are introduced.  
+After going through all the models, we have picked the linear regression model with four predictors as our final selected model. However, we have only considered linear terms in this model, which can be a drawback in this model. We also haven't extensively used K-Fold cross validation here due to time complexity. Therefore in the future, it will be noteworthy to check how adding interaction and non-linear terms and doing K-fold CV changes the predictive ability of all these models that I have tried, or if there is any other family of regression techniques stands out when these new terms / new data are introduced.   
 \newpage
 
 
